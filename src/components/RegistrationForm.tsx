@@ -81,7 +81,12 @@ export function RegistrationForm() {
             });
 
             // Redirect to thank you page with lead_id for pixel deduplication
-            router.push(`/thank-you?lead_id=${newLead.id}`);
+            if (newLead?.id) {
+                router.push(`/thank-you?lead_id=${newLead.id}`);
+            } else {
+                console.warn('Lead created but no ID returned');
+                router.push('/thank-you');
+            }
         } catch (error) {
             console.error('Error submitting form:', error);
             setSubmitError('حدث خطأ أثناء التسجيل. يرجى المحاولة مرة أخرى.');

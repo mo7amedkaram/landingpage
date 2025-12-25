@@ -31,12 +31,14 @@ export interface Lead {
 export async function createLead(lead: Omit<Lead, 'id' | 'created_at' | 'status'>) {
     if (!isConfigured) {
         console.warn('Supabase not configured - lead not saved');
-        return {
+        const mockLead = {
             id: crypto.randomUUID(),
             created_at: new Date().toISOString(),
             status: 'new' as const,
             ...lead,
         } as Lead;
+        console.log('Mock lead created:', mockLead);
+        return mockLead;
     }
 
     const { data, error } = await supabase
@@ -45,7 +47,12 @@ export async function createLead(lead: Omit<Lead, 'id' | 'created_at' | 'status'
         .select()
         .single();
 
-    if (error) throw error;
+    if (error) {
+        console.error('Supabase insert error:', error);
+        throw error;
+    }
+
+    console.log('Lead created successfully:', data);
     return data as Lead;
 }
 
