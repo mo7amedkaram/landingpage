@@ -17,7 +17,7 @@ import {
 } from '@/components/ui';
 import { createLead } from '@/lib/supabase';
 import { scrollToElement } from '@/lib/utils';
-import { trackLeadWithAdvancedMatching, trackCompleteRegistration } from '@/lib/pixel-utils';
+import { trackLeadWithAdvancedMatching } from '@/lib/pixel-utils';
 import { SiteContent } from '@/lib/types';
 import { ThemeProvider } from './ThemeProvider';
 import { TestimonialsGrid } from './TestimonialsGrid';
@@ -105,12 +105,6 @@ export function DynamicLandingPage({ content }: DynamicLandingPageProps) {
                 user_phone: data.user_phone,
                 friend_name: data.friend_name,
                 friend_phone: data.friend_phone,
-            });
-
-            // Track Complete Registration
-            await trackCompleteRegistration({
-                user_name: data.user_name,
-                user_phone: data.user_phone,
             });
 
             router.push('/thank-you');

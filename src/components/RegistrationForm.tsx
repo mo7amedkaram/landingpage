@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui';
 import { createLead } from '@/lib/supabase';
-import { trackLeadWithAdvancedMatching, trackCompleteRegistration } from '@/lib/pixel-utils';
+import { trackLeadWithAdvancedMatching } from '@/lib/pixel-utils';
 import { User, Users, Loader2, CheckCircle } from 'lucide-react';
 
 // Egyptian phone number validation
@@ -78,12 +78,6 @@ export function RegistrationForm() {
                 user_phone: data.user_phone,
                 friend_name: data.friend_name,
                 friend_phone: data.friend_phone,
-            });
-
-            // Track Complete Registration
-            await trackCompleteRegistration({
-                user_name: data.user_name,
-                user_phone: data.user_phone,
             });
 
             // Redirect to thank you page

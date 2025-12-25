@@ -143,24 +143,3 @@ export async function trackInitiateCheckout(): Promise<void> {
         });
     }
 }
-
-/**
- * Track CompleteRegistration event (after successful submission)
- */
-export async function trackCompleteRegistration(userData: {
-    user_name: string;
-    user_phone: string;
-}): Promise<void> {
-    const advancedMatchingData = await prepareAdvancedMatchingData(userData);
-
-    if (typeof window !== 'undefined' && (window as any).fbq) {
-        (window as any).fbq('track', 'CompleteRegistration', {
-            content_name: 'First Aid Course',
-            currency: 'EGP',
-            value: 100,
-            status: 'complete'
-        }, {
-            ...advancedMatchingData
-        });
-    }
-}
