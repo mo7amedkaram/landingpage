@@ -24,8 +24,10 @@ export interface SiteContent {
         headline: string;
         subhead: string;
         ctaText: string;
-        heroImage: string;         // URL from Supabase Storage
-        bullets: string[];         // Dynamic array - user can add/remove
+        heroImage: string;             // URL from Supabase Storage
+        heroVideo: string;             // URL for video background
+        heroBackgroundType: 'image' | 'video';  // Choose between image or video
+        bullets: string[];             // Dynamic array - user can add/remove
     };
     pain_section: {
         title: string;
@@ -113,6 +115,8 @@ export const defaultContent: SiteContent = {
         subhead: "انضم لأقوى منحة إسعافات أولية (عملي 100%).. تعلم كيف تسيطر على الفوضى، تنقذ من تحب، وتتحول من 'شاهد عاجز' إلى 'منقذ واثق' في 3 أيام فقط.",
         ctaText: "احجز مقعدي المجاني ومقعد زميلي الآن",
         heroImage: "",
+        heroVideo: "",
+        heroBackgroundType: "image",
         bullets: [
             "تطبيق عملي كامل بأيدك مش مجرد كلام نظري.",
             "شهادة معتمدة تدعم مسارك المهني.",

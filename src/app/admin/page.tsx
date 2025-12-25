@@ -1118,11 +1118,21 @@ export default function AdminDashboard() {
                                         <Input {...register('hero.ctaText')} />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium mb-2">صورة الهيرو</label>
+                                        <label className="block text-sm font-medium mb-2">فيديو الهيرو (رابط MP4)</label>
+                                        <Input
+                                            {...register('hero.heroVideo')}
+                                            placeholder="https://example.com/video.mp4"
+                                            dir="ltr"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">ضع رابط الفيديو مباشرة (MP4). إذا كان فارغاً، سيظهر البديل.</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-2">صورة الهيرو (بديلة)</label>
                                         <ImageUpload
                                             value={watch('hero.heroImage')}
                                             onChange={(url) => setValue('hero.heroImage', url)}
                                         />
+                                        <p className="text-xs text-gray-500 mt-1">تظهر عند عدم وجود فيديو</p>
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium mb-2">النقاط المميزة</label>

@@ -135,7 +135,6 @@ export function DynamicLandingPage({ content }: DynamicLandingPageProps) {
     return (
         <ThemeProvider theme={content.theme}>
             <main className="min-h-screen overflow-hidden" style={{ backgroundColor: pageBgColor }}>
-
                 {/* ===== SECTION 1: HERO ===== */}
                 <section className="relative min-h-screen bg-white overflow-hidden">
                     {/* Background Pattern */}
@@ -207,7 +206,7 @@ export function DynamicLandingPage({ content }: DynamicLandingPageProps) {
                                 </motion.div>
                             </motion.div>
 
-                            {/* Hero Image */}
+                            {/* Hero Video (replaces image) */}
                             <motion.div
                                 initial={{ opacity: 0, x: -50 }}
                                 animate={{ opacity: 1, x: 0 }}
@@ -215,7 +214,18 @@ export function DynamicLandingPage({ content }: DynamicLandingPageProps) {
                                 className="order-1 lg:order-2"
                             >
                                 <div className="relative max-w-full overflow-hidden">
-                                    {content.hero.heroImage ? (
+                                    {content.hero.heroVideo ? (
+                                        <video
+                                            autoPlay
+                                            muted
+                                            loop
+                                            playsInline
+                                            controls
+                                            className="w-full max-w-full aspect-square object-cover object-center rounded-2xl sm:rounded-3xl shadow-2xl"
+                                        >
+                                            <source src={content.hero.heroVideo} type="video/mp4" />
+                                        </video>
+                                    ) : content.hero.heroImage ? (
                                         <img
                                             src={content.hero.heroImage}
                                             alt="دورة الإسعافات الأولية"
@@ -230,7 +240,7 @@ export function DynamicLandingPage({ content }: DynamicLandingPageProps) {
                                             </div>
                                         </div>
                                     )}
-                                    {/* Badge - safe positioning that doesn't overflow */}
+                                    {/* Badge */}
                                     <div className="absolute bottom-2 right-2 sm:bottom-4 sm:right-4 text-white px-3 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-lg font-bold text-sm sm:text-base" style={{ backgroundColor: accentColor }}>
                                         مجاناً!
                                     </div>
