@@ -93,16 +93,24 @@ export function PixelComponent({
     );
 }
 
-// Helper function to fire Lead conversion event with ROAS value
-export function trackLeadConversion() {
+// Helper function to fire Lead conversion event with ROAS value and deduplication
+export function trackLeadConversion(eventId?: string) {
     if (typeof window !== 'undefined') {
-        // Facebook Lead Event with ROAS value
+        // Facebook Lead Event with ROAS value and eventID for deduplication
         if (typeof window.fbq === 'function') {
-            window.fbq('track', 'Lead', {
+            const eventData = {
                 content_name: 'First Aid Course',
                 value: 90.00,    // Venue fee for ROAS calculation
                 currency: 'EGP'
-            });
+            };
+
+            if (eventId) {
+                // Fire with eventID for deduplication
+                window.fbq('track', 'Lead', eventData, { eventID: eventId });
+            } else {
+                // Fallback without eventID
+                window.fbq('track', 'Lead', eventData);
+            }
         }
         // TikTok Lead Event
         if (typeof window.ttq?.track === 'function') {

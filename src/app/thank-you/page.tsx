@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui';
 import { Button } from '@/components/ui';
@@ -9,21 +10,28 @@ import { getWhatsAppLink } from '@/lib/utils';
 import { CheckCircle, MessageCircle, ArrowLeft, Heart } from 'lucide-react';
 import Link from 'next/link';
 
-export default function ThankYouPage() {
+function ThankYouContent() {
+    const searchParams = useSearchParams();
+    const leadId = searchParams.get('lead_id'); // Get unique DB ID for deduplication
+
     const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201234567890';
     const whatsappMessage = 'مرحباً! أريد تأكيد حجزي في دورة الإسعافات الأولية.';
 
     useEffect(() => {
-        // Prevent duplicate Lead event on page refresh
-        const alreadyFired = sessionStorage.getItem('lead_event_fired');
-
-        if (!alreadyFired) {
-            // Fire Lead conversion event
-            trackLeadConversion();
-            // Mark as fired for this session
-            sessionStorage.setItem('lead_event_fired', 'true');
+        // Use lead_id as eventID for FB Pixel deduplication
+        // This prevents duplicate events even across browser sessions
+        if (leadId) {
+            // Fire with eventID - FB will deduplicate by this ID
+            trackLeadConversion(leadId);
+        } else {
+            // Fallback: use sessionStorage if no lead_id (direct page access)
+            const alreadyFired = sessionStorage.getItem('lead_event_fired');
+            if (!alreadyFired) {
+                trackLeadConversion();
+                sessionStorage.setItem('lead_event_fired', 'true');
+            }
         }
-    }, []);
+    }, [leadId]);
 
     return (
         <main className="min-h-screen bg-gradient-to-bl from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
@@ -94,5 +102,14 @@ export default function ThankYouPage() {
                 </div>
             </div>
         </main>
+    );
+}
+
+// Wrapper with Suspense for useSearchParams (required by Next.js)
+export default function ThankYouPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">جاري التحميل...</div>}>
+            <ThankYouContent />
+        </Suspense>
     );
 }

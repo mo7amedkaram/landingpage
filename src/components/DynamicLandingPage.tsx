@@ -100,14 +100,15 @@ export function DynamicLandingPage({ content }: DynamicLandingPageProps) {
             });
 
             // Save lead to database
-            await createLead({
+            const newLead = await createLead({
                 user_name: data.user_name,
                 user_phone: data.user_phone,
                 friend_name: data.friend_name,
                 friend_phone: data.friend_phone,
             });
 
-            router.push('/thank-you');
+            // Redirect to thank you page with lead_id for pixel deduplication
+            router.push(`/thank-you?lead_id=${newLead.id}`);
         } catch (error) {
             console.error('Error:', error);
         } finally {
