@@ -58,42 +58,9 @@ export default function ThankYouPage() {
                                     تم تسجيل بياناتك وبيانات زميلك مبدئياً
                                 </h2>
                                 <p className="text-gray-600">
-                                    سنتواصل معكم قريباً لتأكيد الحجز وتحديد موعد الدورة
-                                </p>
+                                    سنتواصل معكم قريباً في خلال 5 لــ 7 أيام برسالة القبول وتحديد موعد المنحة                                </p>
                             </motion.div>
 
-                            {/* Next Step */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.5 }}
-                                className="bg-blue-50 rounded-xl p-4 border border-blue-100"
-                            >
-                                <h3 className="font-semibold text-blue-800 mb-2">
-                                    الخطوة التالية:
-                                </h3>
-                                <p className="text-blue-700 text-sm">
-                                    تواصل معنا عبر واتساب لتأكيد حجزك والحصول على تفاصيل الدورة
-                                </p>
-                            </motion.div>
-
-                            {/* WhatsApp CTA */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.6 }}
-                            >
-                                <a
-                                    href={getWhatsAppLink(whatsappNumber, whatsappMessage)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    <Button size="lg" className="w-full text-lg py-6 h-auto bg-green-600 hover:bg-green-700">
-                                        <MessageCircle className="w-6 h-6" />
-                                        تأكيد الحجز عبر واتساب
-                                    </Button>
-                                </a>
-                            </motion.div>
 
                             {/* Back to Home */}
                             <motion.div
