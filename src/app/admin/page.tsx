@@ -20,6 +20,10 @@ import {
     getLeads,
     searchLeads,
     updateLeadStatus,
+    updateLeadsStatusBatch,
+    deleteLeads,
+    deleteAllLeads,
+    createLeadManually,
     type Lead
 } from '@/lib/supabase';
 import { updateSiteContentAction } from '@/actions/update-content';
@@ -47,8 +51,20 @@ import {
     Plus,
     Trash2,
     Save,
-    MessageCircle
+    MessageCircle,
+    CheckSquare,
+    Square,
+    FolderInput,
+    AlertTriangle,
+    UserPlus
 } from 'lucide-react';
+
+// Toast type for notifications
+interface Toast {
+    id: string;
+    type: 'success' | 'error';
+    message: string;
+}
 
 const leadStatuses = [
     { value: 'new', label: 'جديد', color: 'bg-blue-100 text-blue-800' },
@@ -88,6 +104,14 @@ export default function AdminDashboard() {
     const [isLoading, setIsLoading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+    // Lead management state
+    const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
+    const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
+    const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+    const [deleteConfirmText, setDeleteConfirmText] = useState('');
+    const [toasts, setToasts] = useState<Toast[]>([]);
+    const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', source: '' });
 
     // Form for content editing
     const { register, control, handleSubmit, setValue, watch, reset } = useForm<SiteContent>({
@@ -182,6 +206,117 @@ export default function AdminDashboard() {
 
     const handleExport = () => {
         exportToCSV(leads, `leads-${new Date().toISOString().split('T')[0]}`);
+    };
+
+    // Toast helper
+    const showToast = (type: 'success' | 'error', message: string) => {
+        const id = crypto.randomUUID();
+        setToasts(prev => [...prev, { id, type, message }]);
+        setTimeout(() => {
+            setToasts(prev => prev.filter(t => t.id !== id));
+        }, 3000);
+    };
+
+    // Selection handlers
+    const handleSelectAll = () => {
+        if (selectedLeads.size === leads.length) {
+            setSelectedLeads(new Set());
+        } else {
+            setSelectedLeads(new Set(leads.map(l => l.id)));
+        }
+    };
+
+    const handleSelectLead = (leadId: string) => {
+        const newSet = new Set(selectedLeads);
+        if (newSet.has(leadId)) {
+            newSet.delete(leadId);
+        } else {
+            newSet.add(leadId);
+        }
+        setSelectedLeads(newSet);
+    };
+
+    // Batch move handler
+    const handleBatchMove = async (newStatus: Lead['status']) => {
+        const ids = Array.from(selectedLeads);
+        const count = ids.length;
+
+        // Optimistic update
+        setLeads(leads.map(lead =>
+            selectedLeads.has(lead.id) ? { ...lead, status: newStatus } : lead
+        ));
+        setSelectedLeads(new Set());
+
+        try {
+            await updateLeadsStatusBatch(ids, newStatus);
+            const statusLabel = leadStatuses.find(s => s.value === newStatus)?.label || newStatus;
+            showToast('success', `تم نقل ${count} عميل إلى "${statusLabel}"`);
+        } catch (error) {
+            console.error('Error batch updating:', error);
+            showToast('error', 'حدث خطأ أثناء التحديث');
+            loadLeads(); // Rollback
+        }
+    };
+
+    // Delete selected handler
+    const handleDeleteSelected = async () => {
+        const ids = Array.from(selectedLeads);
+        const count = ids.length;
+
+        // Optimistic update
+        setLeads(leads.filter(lead => !selectedLeads.has(lead.id)));
+        setSelectedLeads(new Set());
+
+        try {
+            await deleteLeads(ids);
+            showToast('success', `تم حذف ${count} عميل`);
+        } catch (error) {
+            console.error('Error deleting:', error);
+            showToast('error', 'حدث خطأ أثناء الحذف');
+            loadLeads(); // Rollback
+        }
+    };
+
+    // Delete all handler
+    const handleDeleteAll = async () => {
+        if (deleteConfirmText !== 'DELETE') return;
+
+        const count = leads.length;
+        setLeads([]);
+        setSelectedLeads(new Set());
+        setIsDeleteAllOpen(false);
+        setDeleteConfirmText('');
+
+        try {
+            await deleteAllLeads();
+            showToast('success', `تم حذف جميع العملاء (${count})`);
+        } catch (error) {
+            console.error('Error deleting all:', error);
+            showToast('error', 'حدث خطأ أثناء الحذف');
+            loadLeads(); // Rollback
+        }
+    };
+
+    // Add lead handler
+    const handleAddLead = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newLead.name || !newLead.phone) return;
+
+        try {
+            const created = await createLeadManually({
+                user_name: newLead.name,
+                user_phone: newLead.phone,
+                email: newLead.email,
+                source: newLead.source,
+            });
+            setLeads([created, ...leads]);
+            setNewLead({ name: '', phone: '', email: '', source: '' });
+            setIsAddLeadOpen(false);
+            showToast('success', 'تم إضافة العميل بنجاح');
+        } catch (error) {
+            console.error('Error adding lead:', error);
+            showToast('error', 'حدث خطأ أثناء الإضافة');
+        }
     };
 
     const onSaveContent = async (data: SiteContent) => {
@@ -306,6 +441,7 @@ export default function AdminDashboard() {
                     {/* LEADS TAB */}
                     {activeTab === 'leads' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                            {/* Top Actions Bar */}
                             <Card>
                                 <CardContent className="p-4">
                                     <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -325,14 +461,70 @@ export default function AdminDashboard() {
                                                 <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
                                             </Button>
                                         </div>
-                                        <Button onClick={handleExport} variant="outline" type="button">
-                                            <Download className="w-4 h-4" />
-                                            تصدير CSV
-                                        </Button>
+                                        <div className="flex gap-2">
+                                            <Button onClick={() => setIsAddLeadOpen(true)} variant="outline" type="button" className="gap-2">
+                                                <UserPlus className="w-4 h-4" />
+                                                إضافة عميل
+                                            </Button>
+                                            <Button onClick={handleExport} variant="outline" type="button">
+                                                <Download className="w-4 h-4" />
+                                                تصدير CSV
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
 
+                            {/* Selection Action Bar */}
+                            {selectedLeads.size > 0 && (
+                                <Card className="border-blue-200 bg-blue-50">
+                                    <CardContent className="p-4">
+                                        <div className="flex items-center justify-between flex-wrap gap-3">
+                                            <div className="flex items-center gap-3">
+                                                <CheckSquare className="w-5 h-5 text-blue-600" />
+                                                <span className="font-medium text-blue-800">
+                                                    {selectedLeads.size} محدد
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {/* Move To Dropdown */}
+                                                <div className="relative group">
+                                                    <Button variant="outline" type="button" className="gap-2">
+                                                        <FolderInput className="w-4 h-4" />
+                                                        نقل إلى...
+                                                    </Button>
+                                                    <div className="absolute top-full right-0 mt-1 bg-white border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 min-w-[150px]">
+                                                        {leadStatuses.map(status => (
+                                                            <button
+                                                                key={status.value}
+                                                                type="button"
+                                                                onClick={() => handleBatchMove(status.value)}
+                                                                className="w-full px-4 py-2 text-right hover:bg-gray-100 flex items-center gap-2"
+                                                            >
+                                                                <span className={`w-2 h-2 rounded-full ${status.color.split(' ')[0]}`}></span>
+                                                                {status.label}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Delete Selected */}
+                                                <Button
+                                                    variant="destructive"
+                                                    type="button"
+                                                    onClick={handleDeleteSelected}
+                                                    className="gap-2"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    حذف المحدد
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Stats Cards */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {leadStatuses.map(status => {
                                     const count = leads.filter(l => l.status === status.value).length;
@@ -349,12 +541,26 @@ export default function AdminDashboard() {
                                 })}
                             </div>
 
+                            {/* Data Table */}
                             <Card>
                                 <CardContent className="p-0">
                                     <div className="overflow-x-auto">
-                                        <table className="w-full min-w-[700px]">
+                                        <table className="w-full min-w-[800px]">
                                             <thead className="bg-gray-50 border-b">
                                                 <tr>
+                                                    <th className="px-4 py-3 text-center w-12">
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleSelectAll}
+                                                            className="p-1 hover:bg-gray-200 rounded"
+                                                        >
+                                                            {selectedLeads.size === leads.length && leads.length > 0 ? (
+                                                                <CheckSquare className="w-5 h-5 text-blue-600" />
+                                                            ) : (
+                                                                <Square className="w-5 h-5 text-gray-400" />
+                                                            )}
+                                                        </button>
+                                                    </th>
                                                     <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الاسم</th>
                                                     <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الهاتف</th>
                                                     <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الزميل</th>
@@ -365,12 +571,25 @@ export default function AdminDashboard() {
                                             </thead>
                                             <tbody className="divide-y">
                                                 {isLoading ? (
-                                                    <tr><td colSpan={6} className="px-4 py-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" /></td></tr>
+                                                    <tr><td colSpan={7} className="px-4 py-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-gray-400" /></td></tr>
                                                 ) : leads.length === 0 ? (
-                                                    <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-500">لا توجد تسجيلات</td></tr>
+                                                    <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-500">لا توجد تسجيلات</td></tr>
                                                 ) : (
                                                     leads.map((lead) => (
-                                                        <tr key={lead.id} className="hover:bg-gray-50">
+                                                        <tr key={lead.id} className={`hover:bg-gray-50 ${selectedLeads.has(lead.id) ? 'bg-blue-50' : ''}`}>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSelectLead(lead.id)}
+                                                                    className="p-1 hover:bg-gray-200 rounded"
+                                                                >
+                                                                    {selectedLeads.has(lead.id) ? (
+                                                                        <CheckSquare className="w-5 h-5 text-blue-600" />
+                                                                    ) : (
+                                                                        <Square className="w-5 h-5 text-gray-400" />
+                                                                    )}
+                                                                </button>
+                                                            </td>
                                                             <td className="px-4 py-3 font-medium">{lead.user_name}</td>
                                                             <td className="px-4 py-3 text-gray-600 font-mono" dir="ltr">{lead.user_phone}</td>
                                                             <td className="px-4 py-3 text-gray-600">{lead.friend_name}</td>
@@ -392,8 +611,160 @@ export default function AdminDashboard() {
                                     </div>
                                 </CardContent>
                             </Card>
+
+                            {/* Delete ALL Button */}
+                            <div className="flex justify-center pt-4">
+                                <Button
+                                    variant="destructive"
+                                    type="button"
+                                    onClick={() => setIsDeleteAllOpen(true)}
+                                    className="gap-2 bg-red-600 hover:bg-red-700"
+                                >
+                                    <AlertTriangle className="w-4 h-4" />
+                                    حذف جميع العملاء
+                                </Button>
+                            </div>
                         </motion.div>
                     )}
+
+                    {/* Add Lead Modal */}
+                    {isAddLeadOpen && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsAddLeadOpen(false)}>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                    <UserPlus className="w-5 h-5 text-blue-600" />
+                                    إضافة عميل جديد
+                                </h3>
+                                <form onSubmit={handleAddLead} className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">الاسم *</label>
+                                        <Input
+                                            value={newLead.name}
+                                            onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
+                                            placeholder="اسم العميل"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">الهاتف *</label>
+                                        <Input
+                                            value={newLead.phone}
+                                            onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
+                                            placeholder="رقم الهاتف"
+                                            dir="ltr"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">البريد الإلكتروني</label>
+                                        <Input
+                                            value={newLead.email}
+                                            onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
+                                            placeholder="البريد الإلكتروني (اختياري)"
+                                            dir="ltr"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1">المصدر</label>
+                                        <Input
+                                            value={newLead.source}
+                                            onChange={(e) => setNewLead({ ...newLead, source: e.target.value })}
+                                            placeholder="مصدر العميل (اختياري)"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2 pt-4">
+                                        <Button type="submit" className="flex-1 gap-2">
+                                            <Plus className="w-4 h-4" />
+                                            إضافة
+                                        </Button>
+                                        <Button type="button" variant="outline" onClick={() => setIsAddLeadOpen(false)}>
+                                            إلغاء
+                                        </Button>
+                                    </div>
+                                </form>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Delete All Confirmation Modal */}
+                    {isDeleteAllOpen && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsDeleteAllOpen(false)}>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="text-center mb-4">
+                                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                        <AlertTriangle className="w-8 h-8 text-red-600" />
+                                    </div>
+                                    <h3 className="text-xl font-bold text-red-600">تحذير: حذف جميع البيانات</h3>
+                                    <p className="text-gray-600 mt-2">
+                                        سيتم حذف جميع العملاء ({leads.length}) بشكل نهائي. لا يمكن التراجع عن هذا الإجراء.
+                                    </p>
+                                </div>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium mb-1 text-gray-700">
+                                            اكتب <span className="font-bold text-red-600">DELETE</span> للتأكيد:
+                                        </label>
+                                        <Input
+                                            value={deleteConfirmText}
+                                            onChange={(e) => setDeleteConfirmText(e.target.value)}
+                                            placeholder="DELETE"
+                                            dir="ltr"
+                                            className="text-center font-mono"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="destructive"
+                                            onClick={handleDeleteAll}
+                                            disabled={deleteConfirmText !== 'DELETE'}
+                                            className="flex-1 gap-2"
+                                        >
+                                            <Trash2 className="w-4 h-4" />
+                                            حذف الكل نهائياً
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => {
+                                                setIsDeleteAllOpen(false);
+                                                setDeleteConfirmText('');
+                                            }}
+                                        >
+                                            إلغاء
+                                        </Button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Toast Notifications */}
+                    <div className="fixed bottom-4 left-4 z-50 space-y-2">
+                        {toasts.map(toast => (
+                            <motion.div
+                                key={toast.id}
+                                initial={{ opacity: 0, x: -100 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -100 }}
+                                className={`px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 ${toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                                    }`}
+                            >
+                                {toast.type === 'success' ? <Check className="w-5 h-5" /> : <X className="w-5 h-5" />}
+                                {toast.message}
+                            </motion.div>
+                        ))}
+                    </div>
 
                     {/* THEME TAB */}
                     {activeTab === 'theme' && (

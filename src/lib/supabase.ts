@@ -87,6 +87,83 @@ export async function searchLeads(phone: string) {
     return data as Lead[];
 }
 
+// Batch update status for multiple leads
+export async function updateLeadsStatusBatch(ids: string[], status: Lead['status']) {
+    if (!isConfigured) return [];
+
+    const { data, error } = await supabase
+        .from('leads')
+        .update({ status })
+        .in('id', ids)
+        .select();
+
+    if (error) throw error;
+    return data as Lead[];
+}
+
+// Delete specific leads by ID
+export async function deleteLeads(ids: string[]) {
+    if (!isConfigured) return true;
+
+    const { error } = await supabase
+        .from('leads')
+        .delete()
+        .in('id', ids);
+
+    if (error) throw error;
+    return true;
+}
+
+// Delete ALL leads (danger zone)
+export async function deleteAllLeads() {
+    if (!isConfigured) return true;
+
+    const { error } = await supabase
+        .from('leads')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+
+    if (error) throw error;
+    return true;
+}
+
+// Manually create a lead with optional fields
+export interface ManualLeadInput {
+    user_name: string;
+    user_phone: string;
+    email?: string;
+    source?: string;
+}
+
+export async function createLeadManually(lead: ManualLeadInput) {
+    if (!isConfigured) {
+        return {
+            id: crypto.randomUUID(),
+            created_at: new Date().toISOString(),
+            status: 'new' as const,
+            user_name: lead.user_name,
+            user_phone: lead.user_phone,
+            friend_name: '',
+            friend_phone: '',
+        } as Lead;
+    }
+
+    const { data, error } = await supabase
+        .from('leads')
+        .insert([{
+            user_name: lead.user_name,
+            user_phone: lead.user_phone,
+            friend_name: lead.email || '',
+            friend_phone: lead.source || '',
+            status: 'new',
+        }])
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data as Lead;
+}
+
 // ============================================
 // SITE CONTENT CMS FUNCTIONS
 // ============================================
