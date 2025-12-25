@@ -14,8 +14,15 @@ export default function ThankYouPage() {
     const whatsappMessage = 'مرحباً! أريد تأكيد حجزي في دورة الإسعافات الأولية.';
 
     useEffect(() => {
-        // Fire Lead conversion event on page load
-        trackLeadConversion();
+        // Prevent duplicate Lead event on page refresh
+        const alreadyFired = sessionStorage.getItem('lead_event_fired');
+
+        if (!alreadyFired) {
+            // Fire Lead conversion event
+            trackLeadConversion();
+            // Mark as fired for this session
+            sessionStorage.setItem('lead_event_fired', 'true');
+        }
     }, []);
 
     return (
