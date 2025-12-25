@@ -46,7 +46,8 @@ import {
     Globe,
     Plus,
     Trash2,
-    Save
+    Save,
+    MessageCircle
 } from 'lucide-react';
 
 const leadStatuses = [
@@ -56,7 +57,7 @@ const leadStatuses = [
     { value: 'rejected', label: 'مرفوض', color: 'bg-red-100 text-red-800' },
 ] as const;
 
-type TabType = 'leads' | 'theme' | 'hero' | 'pain' | 'story' | 'curriculum' | 'transformation' | 'audience' | 'bonuses' | 'pricing' | 'faq' | 'footer' | 'pixels';
+type TabType = 'leads' | 'theme' | 'hero' | 'pain' | 'story' | 'curriculum' | 'transformation' | 'audience' | 'bonuses' | 'pricing' | 'testimonials' | 'faq' | 'footer' | 'pixels';
 
 const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'leads', label: 'العملاء', icon: <Users className="w-4 h-4" /> },
@@ -69,6 +70,7 @@ const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'audience', label: 'الجمهور', icon: <Users className="w-4 h-4" /> },
     { id: 'bonuses', label: 'الهدايا', icon: <Gift className="w-4 h-4" /> },
     { id: 'pricing', label: 'السعر', icon: <SettingsIcon className="w-4 h-4" /> },
+    { id: 'testimonials', label: 'التقييمات', icon: <MessageCircle className="w-4 h-4" /> },
     { id: 'faq', label: 'الأسئلة', icon: <HelpCircle className="w-4 h-4" /> },
     { id: 'footer', label: 'الفوتر', icon: <FileText className="w-4 h-4" /> },
     { id: 'pixels', label: 'التتبع', icon: <Globe className="w-4 h-4" /> },
@@ -121,6 +123,11 @@ export default function AdminDashboard() {
     const { fields: curriculumFields } = useFieldArray({
         control,
         name: 'curriculum' as never,
+    });
+
+    const { fields: testimonialFields, append: appendTestimonial, remove: removeTestimonial } = useFieldArray({
+        control,
+        name: 'testimonials.items' as never,
     });
 
     const loadLeads = useCallback(async () => {
@@ -794,6 +801,131 @@ export default function AdminDashboard() {
                                     </div>
                                 </CardContent>
                             </Card>
+                        </motion.div>
+                    )}
+
+                    {/* TESTIMONIALS TAB */}
+                    {activeTab === 'testimonials' && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                            <div className="max-w-4xl mx-auto space-y-6">
+                                {/* Section Header Settings */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <MessageCircle className="w-5 h-5" />
+                                            إعدادات قسم التقييمات
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">عنوان القسم</label>
+                                            <Input {...register('testimonials.title')} placeholder="رأي خريجي الدفعات السابقة" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium mb-2">العنوان الفرعي</label>
+                                            <Input {...register('testimonials.subtitle')} placeholder="قصص حقيقية من شباب زيك غيروا حياتهم..." />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Review Cards */}
+                                <div className="space-y-4">
+                                    {testimonialFields.map((field, index) => (
+                                        <Card key={field.id} className="border-r-4 border-r-sky-500">
+                                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                                <CardTitle className="text-lg flex items-center gap-2">
+                                                    <span className="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center text-sky-600 font-bold text-sm">
+                                                        {index + 1}
+                                                    </span>
+                                                    تقييم #{index + 1}
+                                                </CardTitle>
+                                                <Button type="button" variant="destructive" size="sm" onClick={() => removeTestimonial(index)}>
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                                {/* Row 1: Name & Title */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-2">اسم المراجع *</label>
+                                                        <Input
+                                                            {...register(`testimonials.items.${index}.name` as const)}
+                                                            placeholder="مثال: أحمد محمد"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-sm font-medium mb-2">المسمى الوظيفي / الوصف</label>
+                                                        <Input
+                                                            {...register(`testimonials.items.${index}.title` as const)}
+                                                            placeholder="مثال: خريج دفعة 2024"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Row 2: Rating */}
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-2">التقييم (نجوم)</label>
+                                                    <div className="flex items-center gap-4">
+                                                        <input
+                                                            type="range"
+                                                            min="1"
+                                                            max="5"
+                                                            {...register(`testimonials.items.${index}.rating` as const, { valueAsNumber: true })}
+                                                            className="w-32"
+                                                        />
+                                                        <div className="flex gap-1">
+                                                            {[...Array(5)].map((_, i) => (
+                                                                <span
+                                                                    key={i}
+                                                                    className={`text-xl ${i < (watch(`testimonials.items.${index}.rating` as const) || 5) ? 'text-amber-400' : 'text-gray-200'}`}
+                                                                >
+                                                                    ★
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Row 3: Review Text */}
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-2">نص التقييم *</label>
+                                                    <textarea
+                                                        {...register(`testimonials.items.${index}.review` as const)}
+                                                        className="w-full p-3 border rounded-lg min-h-[100px] resize-none"
+                                                        placeholder="اكتب تقييم العميل هنا..."
+                                                    />
+                                                </div>
+
+                                                {/* Row 4: Avatar (Optional) */}
+                                                <div>
+                                                    <label className="block text-sm font-medium mb-2">صورة المراجع (اختياري)</label>
+                                                    <ImageUpload
+                                                        value={watch(`testimonials.items.${index}.avatar` as const) || ''}
+                                                        onChange={(url) => setValue(`testimonials.items.${index}.avatar`, url)}
+                                                    />
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ))}
+                                </div>
+
+                                {/* Add Review Button */}
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => appendTestimonial({
+                                        id: Date.now(),
+                                        name: '',
+                                        title: '',
+                                        avatar: '',
+                                        rating: 5,
+                                        review: ''
+                                    })}
+                                    className="w-full py-6 border-dashed border-2 hover:border-sky-400 hover:bg-sky-50 transition-colors"
+                                >
+                                    <Plus className="w-5 h-5" /> إضافة تقييم جديد
+                                </Button>
+                            </div>
                         </motion.div>
                     )}
 

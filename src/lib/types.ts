@@ -78,6 +78,18 @@ export interface SiteContent {
         tiktok: string;
         snapchat: string;
     };
+    testimonials: {
+        title: string;
+        subtitle: string;
+        items: {
+            id: number;
+            name: string;           // Reviewer name
+            title?: string;         // Optional title (e.g., "خريج دفعة 2024")
+            avatar?: string;        // Optional avatar image URL
+            rating: number;         // 1-5 star rating
+            review: string;         // The review text
+        }[];
+    };
 }
 
 // Default/initial content
@@ -228,5 +240,35 @@ export const defaultContent: SiteContent = {
         facebook: "",
         tiktok: "",
         snapchat: "",
+    },
+    testimonials: {
+        title: "رأي خريجي الدفعات السابقة",
+        subtitle: "قصص حقيقية من شباب زيك غيروا حياتهم واتعلموا ينقذوا غيرهم.",
+        items: [
+            {
+                id: 1,
+                name: "أحمد محمد",
+                title: "خريج دفعة 2024",
+                avatar: "",
+                rating: 5,
+                review: "دورة ممتازة جداً! اتعلمت مهارات ماكنتش بحلم بيها. المدربين محترفين والتطبيق العملي فادني جداً."
+            },
+            {
+                id: 2,
+                name: "سارة علي",
+                title: "طالبة صيدلة",
+                avatar: "",
+                rating: 5,
+                review: "كنت خايفة من الدم والإبر. دلوقتي بعد الدورة بقيت واثقة وبأخد الإبر من أهلي بنفسي!"
+            },
+            {
+                id: 3,
+                name: "محمود حسن",
+                title: "مهندس",
+                avatar: "",
+                rating: 5,
+                review: "أفضل استثمار في نفسي. المنحة دي غيرت نظرتي للطوارئ وخلتني أقدر أساعد أي حد."
+            },
+        ],
     },
 };

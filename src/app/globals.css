@@ -28,6 +28,45 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ============================================ */
+/* MOBILE-FIRST RESPONSIVE FIXES               */
+/* ============================================ */
+
+/* Prevent horizontal overflow on all viewports */
+html,
+body {
+  overflow-x: hidden;
+  max-width: 100vw;
+}
+
+/* Ensure all images scale properly and never overflow */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Force text wrapping on all text elements */
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+span,
+li,
+a {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Container safety - ensure container never exceeds viewport */
+.container {
+  max-width: 100%;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
@@ -128,4 +167,21 @@ input[dir="ltr"] {
 
 .ProseMirror:focus {
   outline: none;
+}
+
+/* Floating CTA pulse animation */
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.4);
+  }
+
+  50% {
+    box-shadow: 0 4px 30px rgba(239, 68, 68, 0.6), 0 0 0 8px rgba(239, 68, 68, 0.1);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }

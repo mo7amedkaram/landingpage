@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cairo } from "next/font/google";
 import "./globals.css";
 import { PixelComponent } from "@/components/PixelComponent";
+import { FloatingCTA } from "@/components/FloatingCTA";
 import { getSiteContent } from "@/lib/supabase";
 
 const cairo = Cairo({
@@ -30,9 +31,12 @@ export default async function RootLayout({
 }) {
   // Fetch pixel settings from CMS
   let pixels = { facebook: '', tiktok: '', snapchat: '' };
+  let buttonColor = '#ef4444';
   try {
     const content = await getSiteContent();
     pixels = content.pixels;
+    // Use theme's heroCta color for the floating CTA
+    buttonColor = content.theme?.buttons?.heroCta || '#ef4444';
   } catch (error) {
     console.error("Failed to fetch content:", error);
   }
@@ -46,6 +50,7 @@ export default async function RootLayout({
           snapchatPixelId={pixels.snapchat || null}
         />
         {children}
+        <FloatingCTA buttonColor={buttonColor} />
       </body>
     </html>
   );
