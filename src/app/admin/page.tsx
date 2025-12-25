@@ -24,7 +24,14 @@ import {
     deleteLeads,
     deleteAllLeads,
     createLeadManually,
-    type Lead
+    getSegments,
+    createSegment,
+    updateSegment,
+    deleteSegment,
+    updateLeadSegment,
+    updateLeadsSegmentBatch,
+    type Lead,
+    type CrmSegment
 } from '@/lib/supabase';
 import { updateSiteContentAction } from '@/actions/update-content';
 import { SiteContent, defaultContent } from '@/lib/types';
@@ -56,7 +63,9 @@ import {
     Square,
     FolderInput,
     AlertTriangle,
-    UserPlus
+    UserPlus,
+    Sliders,
+    Edit
 } from 'lucide-react';
 
 // Toast type for notifications
@@ -112,6 +121,12 @@ export default function AdminDashboard() {
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [toasts, setToasts] = useState<Toast[]>([]);
     const [newLead, setNewLead] = useState({ name: '', phone: '', email: '', source: '' });
+
+    // Dynamic segments state
+    const [segments, setSegments] = useState<CrmSegment[]>([]);
+    const [isManageSegmentsOpen, setIsManageSegmentsOpen] = useState(false);
+    const [editingSegment, setEditingSegment] = useState<CrmSegment | null>(null);
+    const [newSegment, setNewSegment] = useState({ name: '', color: 'blue' });
 
     // Form for content editing
     const { register, control, handleSubmit, setValue, watch, reset } = useForm<SiteContent>({
@@ -176,12 +191,22 @@ export default function AdminDashboard() {
         }
     }, [reset]);
 
+    const loadSegments = useCallback(async () => {
+        try {
+            const data = await getSegments();
+            setSegments(data);
+        } catch (error) {
+            console.error('Error loading segments:', error);
+        }
+    }, []);
+
     useEffect(() => {
         if (isAuthenticated) {
             loadLeads();
             loadContent();
+            loadSegments();
         }
-    }, [isAuthenticated, loadLeads, loadContent]);
+    }, [isAuthenticated, loadLeads, loadContent, loadSegments]);
 
     const handlePinSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -236,21 +261,21 @@ export default function AdminDashboard() {
         setSelectedLeads(newSet);
     };
 
-    // Batch move handler
-    const handleBatchMove = async (newStatus: Lead['status']) => {
+    // Batch move handler - now uses dynamic segments
+    const handleBatchMoveToSegment = async (segmentId: string) => {
         const ids = Array.from(selectedLeads);
         const count = ids.length;
+        const segmentName = segments.find(s => s.id === segmentId)?.name || '';
 
         // Optimistic update
         setLeads(leads.map(lead =>
-            selectedLeads.has(lead.id) ? { ...lead, status: newStatus } : lead
+            selectedLeads.has(lead.id) ? { ...lead, segment_id: segmentId } : lead
         ));
         setSelectedLeads(new Set());
 
         try {
-            await updateLeadsStatusBatch(ids, newStatus);
-            const statusLabel = leadStatuses.find(s => s.value === newStatus)?.label || newStatus;
-            showToast('success', `تم نقل ${count} عميل إلى "${statusLabel}"`);
+            await updateLeadsSegmentBatch(ids, segmentId);
+            showToast('success', `تم نقل ${count} عميل إلى "${segmentName}"`);
         } catch (error) {
             console.error('Error batch updating:', error);
             showToast('error', 'حدث خطأ أثناء التحديث');
@@ -317,6 +342,78 @@ export default function AdminDashboard() {
             console.error('Error adding lead:', error);
             showToast('error', 'حدث خطأ أثناء الإضافة');
         }
+    };
+
+    // Segment management handlers
+    const handleCreateSegment = async () => {
+        if (!newSegment.name) return;
+        try {
+            const created = await createSegment({
+                name: newSegment.name,
+                color: newSegment.color,
+                order_index: segments.length,
+            });
+            setSegments([...segments, created]);
+            setNewSegment({ name: '', color: 'blue' });
+            showToast('success', 'تم إنشاء القسم بنجاح');
+        } catch (error) {
+            console.error('Error creating segment:', error);
+            showToast('error', 'حدث خطأ أثناء الإنشاء');
+        }
+    };
+
+    const handleUpdateSegmentSubmit = async () => {
+        if (!editingSegment) return;
+        try {
+            const updated = await updateSegment(editingSegment.id, {
+                name: editingSegment.name,
+                color: editingSegment.color,
+            });
+            setSegments(segments.map(s => s.id === updated.id ? updated : s));
+            setEditingSegment(null);
+            showToast('success', 'تم تحديث القسم بنجاح');
+        } catch (error) {
+            console.error('Error updating segment:', error);
+            showToast('error', 'حدث خطأ أثناء التحديث');
+        }
+    };
+
+    const handleDeleteSegmentConfirm = async (id: string) => {
+        // Move leads to first segment before deleting
+        const defaultSegment = segments.find(s => s.id !== id);
+        if (!defaultSegment) {
+            showToast('error', 'لا يمكن حذف القسم الوحيد');
+            return;
+        }
+        try {
+            await deleteSegment(id, defaultSegment.id);
+            setSegments(segments.filter(s => s.id !== id));
+            setLeads(leads.map(l => l.segment_id === id ? { ...l, segment_id: defaultSegment.id } : l));
+            showToast('success', 'تم حذف القسم ونقل العملاء');
+        } catch (error) {
+            console.error('Error deleting segment:', error);
+            showToast('error', 'حدث خطأ أثناء الحذف');
+        }
+    };
+
+    // Helper: get segment color class
+    const getSegmentColorClass = (color: string) => {
+        const colorMap: Record<string, string> = {
+            blue: 'bg-blue-100 text-blue-800',
+            yellow: 'bg-yellow-100 text-yellow-800',
+            green: 'bg-green-100 text-green-800',
+            red: 'bg-red-100 text-red-800',
+            purple: 'bg-purple-100 text-purple-800',
+            pink: 'bg-pink-100 text-pink-800',
+            orange: 'bg-orange-100 text-orange-800',
+            gray: 'bg-gray-100 text-gray-800',
+        };
+        return colorMap[color] || colorMap.blue;
+    };
+
+    // Helper: get lead's segment
+    const getLeadSegment = (lead: Lead): CrmSegment | undefined => {
+        return segments.find(s => s.id === lead.segment_id) || segments[0];
     };
 
     const onSaveContent = async (data: SiteContent) => {
@@ -462,6 +559,10 @@ export default function AdminDashboard() {
                                             </Button>
                                         </div>
                                         <div className="flex gap-2">
+                                            <Button onClick={() => setIsManageSegmentsOpen(true)} variant="outline" type="button" className="gap-2">
+                                                <Sliders className="w-4 h-4" />
+                                                إدارة الأقسام
+                                            </Button>
                                             <Button onClick={() => setIsAddLeadOpen(true)} variant="outline" type="button" className="gap-2">
                                                 <UserPlus className="w-4 h-4" />
                                                 إضافة عميل
@@ -494,15 +595,15 @@ export default function AdminDashboard() {
                                                         نقل إلى...
                                                     </Button>
                                                     <div className="absolute top-full right-0 mt-1 bg-white border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 min-w-[150px]">
-                                                        {leadStatuses.map(status => (
+                                                        {segments.map(segment => (
                                                             <button
-                                                                key={status.value}
+                                                                key={segment.id}
                                                                 type="button"
-                                                                onClick={() => handleBatchMove(status.value)}
+                                                                onClick={() => handleBatchMoveToSegment(segment.id)}
                                                                 className="w-full px-4 py-2 text-right hover:bg-gray-100 flex items-center gap-2"
                                                             >
-                                                                <span className={`w-2 h-2 rounded-full ${status.color.split(' ')[0]}`}></span>
-                                                                {status.label}
+                                                                <span className={`w-2 h-2 rounded-full ${getSegmentColorClass(segment.color).split(' ')[0]}`}></span>
+                                                                {segment.name}
                                                             </button>
                                                         ))}
                                                     </div>
@@ -526,15 +627,15 @@ export default function AdminDashboard() {
 
                             {/* Stats Cards */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {leadStatuses.map(status => {
-                                    const count = leads.filter(l => l.status === status.value).length;
+                                {segments.map(segment => {
+                                    const count = leads.filter(l => l.segment_id === segment.id || (!l.segment_id && segment.order_index === 0)).length;
                                     return (
-                                        <Card key={status.value}>
+                                        <Card key={segment.id}>
                                             <CardContent className="p-4 text-center">
-                                                <div className={`text-2xl font-bold ${status.color.replace('bg-', 'text-').replace('-100', '-600')}`}>
+                                                <div className={`text-2xl font-bold ${getSegmentColorClass(segment.color).replace('bg-', 'text-').replace('-100', '-600')}`}>
                                                     {count}
                                                 </div>
-                                                <div className="text-sm text-gray-500">{status.label}</div>
+                                                <div className="text-sm text-gray-500">{segment.name}</div>
                                             </CardContent>
                                         </Card>
                                     );
@@ -596,9 +697,18 @@ export default function AdminDashboard() {
                                                             <td className="px-4 py-3 text-gray-600 font-mono" dir="ltr">{lead.friend_phone}</td>
                                                             <td className="px-4 py-3">
                                                                 <Select
-                                                                    value={lead.status}
-                                                                    onChange={(e) => handleStatusChange(lead.id, e.target.value as Lead['status'])}
-                                                                    options={leadStatuses.map(s => ({ value: s.value, label: s.label }))}
+                                                                    value={lead.segment_id || segments[0]?.id || ''}
+                                                                    onChange={async (e) => {
+                                                                        const newSegmentId = e.target.value;
+                                                                        setLeads(leads.map(l => l.id === lead.id ? { ...l, segment_id: newSegmentId } : l));
+                                                                        try {
+                                                                            await updateLeadSegment(lead.id, newSegmentId);
+                                                                        } catch (error) {
+                                                                            console.error('Error updating segment:', error);
+                                                                            loadLeads();
+                                                                        }
+                                                                    }}
+                                                                    options={segments.map(s => ({ value: s.id, label: s.name }))}
                                                                     className="h-8 text-sm"
                                                                 />
                                                             </td>
@@ -742,6 +852,113 @@ export default function AdminDashboard() {
                                             }}
                                         >
                                             إلغاء
+                                        </Button>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </div>
+                    )}
+
+                    {/* Manage Segments Modal */}
+                    {isManageSegmentsOpen && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsManageSegmentsOpen(false)}>
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="bg-white rounded-xl p-6 max-w-lg w-full mx-4 shadow-xl max-h-[80vh] overflow-y-auto"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-xl font-bold flex items-center gap-2">
+                                        <Sliders className="w-5 h-5" />
+                                        إدارة الأقسام
+                                    </h3>
+                                    <Button variant="ghost" size="icon" onClick={() => setIsManageSegmentsOpen(false)}>
+                                        <X className="w-5 h-5" />
+                                    </Button>
+                                </div>
+
+                                {/* Existing Segments List */}
+                                <div className="space-y-2 mb-6">
+                                    {segments.map(segment => (
+                                        <div key={segment.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                                            {editingSegment?.id === segment.id ? (
+                                                <>
+                                                    <Input
+                                                        value={editingSegment.name}
+                                                        onChange={(e) => setEditingSegment({ ...editingSegment, name: e.target.value })}
+                                                        className="flex-1"
+                                                    />
+                                                    <select
+                                                        value={editingSegment.color}
+                                                        onChange={(e) => setEditingSegment({ ...editingSegment, color: e.target.value })}
+                                                        className="border rounded px-2 py-1"
+                                                    >
+                                                        <option value="blue">أزرق</option>
+                                                        <option value="yellow">أصفر</option>
+                                                        <option value="green">أخضر</option>
+                                                        <option value="red">أحمر</option>
+                                                        <option value="purple">بنفسجي</option>
+                                                        <option value="orange">برتقالي</option>
+                                                        <option value="gray">رمادي</option>
+                                                    </select>
+                                                    <Button size="sm" onClick={handleUpdateSegmentSubmit}>
+                                                        <Check className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button size="sm" variant="outline" onClick={() => setEditingSegment(null)}>
+                                                        <X className="w-4 h-4" />
+                                                    </Button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className={`w-3 h-3 rounded-full ${getSegmentColorClass(segment.color).split(' ')[0]}`}></span>
+                                                    <span className="flex-1 font-medium">{segment.name}</span>
+                                                    <span className="text-sm text-gray-500">
+                                                        ({leads.filter(l => l.segment_id === segment.id || (!l.segment_id && segment.order_index === 0)).length})
+                                                    </span>
+                                                    <Button size="sm" variant="ghost" onClick={() => setEditingSegment(segment)}>
+                                                        <Edit className="w-4 h-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        className="text-red-600 hover:text-red-700"
+                                                        onClick={() => handleDeleteSegmentConfirm(segment.id)}
+                                                        disabled={segments.length <= 1}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Add New Segment */}
+                                <div className="border-t pt-4">
+                                    <h4 className="font-semibold mb-3">إضافة قسم جديد</h4>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            value={newSegment.name}
+                                            onChange={(e) => setNewSegment({ ...newSegment, name: e.target.value })}
+                                            placeholder="اسم القسم"
+                                            className="flex-1"
+                                        />
+                                        <select
+                                            value={newSegment.color}
+                                            onChange={(e) => setNewSegment({ ...newSegment, color: e.target.value })}
+                                            className="border rounded px-2 py-1"
+                                        >
+                                            <option value="blue">أزرق</option>
+                                            <option value="yellow">أصفر</option>
+                                            <option value="green">أخضر</option>
+                                            <option value="red">أحمر</option>
+                                            <option value="purple">بنفسجي</option>
+                                            <option value="orange">برتقالي</option>
+                                            <option value="gray">رمادي</option>
+                                        </select>
+                                        <Button onClick={handleCreateSegment} disabled={!newSegment.name}>
+                                            <Plus className="w-4 h-4" />
                                         </Button>
                                     </div>
                                 </div>

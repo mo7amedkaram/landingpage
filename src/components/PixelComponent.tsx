@@ -93,12 +93,16 @@ export function PixelComponent({
     );
 }
 
-// Helper function to fire Lead conversion event
+// Helper function to fire Lead conversion event with ROAS value
 export function trackLeadConversion() {
     if (typeof window !== 'undefined') {
-        // Facebook Lead Event
+        // Facebook Lead Event with ROAS value
         if (typeof window.fbq === 'function') {
-            window.fbq('track', 'Lead');
+            window.fbq('track', 'Lead', {
+                content_name: 'First Aid Course',
+                value: 90.00,    // Venue fee for ROAS calculation
+                currency: 'EGP'
+            });
         }
         // TikTok Lead Event
         if (typeof window.ttq?.track === 'function') {

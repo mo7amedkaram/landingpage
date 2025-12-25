@@ -25,6 +25,7 @@ export interface Lead {
     friend_name: string;
     friend_phone: string;
     status: 'new' | 'contacted' | 'confirmed' | 'rejected';
+    segment_id?: string; // Dynamic segment reference
 }
 
 export async function createLead(lead: Omit<Lead, 'id' | 'created_at' | 'status'>) {
@@ -162,6 +163,121 @@ export async function createLeadManually(lead: ManualLeadInput) {
 
     if (error) throw error;
     return data as Lead;
+}
+
+// ============================================
+// CRM SEGMENTS FUNCTIONS
+// ============================================
+
+export interface CrmSegment {
+    id: string;
+    name: string;
+    color: string;
+    order_index: number;
+    created_at?: string;
+}
+
+// Default segments for when DB not configured
+const defaultSegments: CrmSegment[] = [
+    { id: '1', name: 'جديد', color: 'blue', order_index: 0 },
+    { id: '2', name: 'تم التواصل', color: 'yellow', order_index: 1 },
+    { id: '3', name: 'مؤكد', color: 'green', order_index: 2 },
+    { id: '4', name: 'مرفوض', color: 'red', order_index: 3 },
+];
+
+export async function getSegments(): Promise<CrmSegment[]> {
+    if (!isConfigured) return defaultSegments;
+
+    const { data, error } = await supabase
+        .from('crm_segments')
+        .select('*')
+        .order('order_index', { ascending: true });
+
+    if (error) {
+        console.warn('Failed to fetch segments, using defaults:', error);
+        return defaultSegments;
+    }
+    return data as CrmSegment[];
+}
+
+export async function createSegment(segment: Omit<CrmSegment, 'id' | 'created_at'>): Promise<CrmSegment> {
+    if (!isConfigured) {
+        return { id: crypto.randomUUID(), ...segment };
+    }
+
+    const { data, error } = await supabase
+        .from('crm_segments')
+        .insert([segment])
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data as CrmSegment;
+}
+
+export async function updateSegment(id: string, updates: Partial<CrmSegment>): Promise<CrmSegment> {
+    if (!isConfigured) {
+        return { id, name: '', color: '', order_index: 0, ...updates } as CrmSegment;
+    }
+
+    const { data, error } = await supabase
+        .from('crm_segments')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data as CrmSegment;
+}
+
+export async function deleteSegment(id: string, moveToSegmentId?: string): Promise<boolean> {
+    if (!isConfigured) return true;
+
+    // If moveToSegmentId provided, move all leads first
+    if (moveToSegmentId) {
+        await supabase
+            .from('leads')
+            .update({ segment_id: moveToSegmentId })
+            .eq('segment_id', id);
+    }
+
+    const { error } = await supabase
+        .from('crm_segments')
+        .delete()
+        .eq('id', id);
+
+    if (error) throw error;
+    return true;
+}
+
+// Update single lead segment
+export async function updateLeadSegment(leadId: string, segmentId: string): Promise<Lead | null> {
+    if (!isConfigured) return null;
+
+    const { data, error } = await supabase
+        .from('leads')
+        .update({ segment_id: segmentId })
+        .eq('id', leadId)
+        .select()
+        .single();
+
+    if (error) throw error;
+    return data as Lead;
+}
+
+// Batch update segment for multiple leads
+export async function updateLeadsSegmentBatch(leadIds: string[], segmentId: string): Promise<Lead[]> {
+    if (!isConfigured) return [];
+
+    const { data, error } = await supabase
+        .from('leads')
+        .update({ segment_id: segmentId })
+        .in('id', leadIds)
+        .select();
+
+    if (error) throw error;
+    return data as Lead[];
 }
 
 // ============================================
