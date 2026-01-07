@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import Script from 'next/script';
 
 interface PixelComponentProps {
@@ -28,18 +27,9 @@ export function PixelComponent({
     snapchatPixelId
 }: PixelComponentProps) {
 
-    useEffect(() => {
-        // Fire PageView on mount
-        if (facebookPixelId && typeof window.fbq === 'function') {
-            window.fbq('track', 'PageView');
-        }
-        if (tiktokPixelId && typeof window.ttq?.page === 'function') {
-            window.ttq.page();
-        }
-        if (snapchatPixelId && typeof window.snaptr === 'function') {
-            window.snaptr('track', 'PAGE_VIEW');
-        }
-    }, [facebookPixelId, tiktokPixelId, snapchatPixelId]);
+    // NOTE: PageView events are already fired in the inline scripts below.
+    // We intentionally do NOT fire them again in useEffect to avoid duplicate events.
+    // The inline scripts run once when the pixel loads, which is the correct behavior.
 
     return (
         <>

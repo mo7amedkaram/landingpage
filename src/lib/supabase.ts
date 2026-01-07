@@ -52,7 +52,14 @@ export async function createLead(lead: Omit<Lead, 'id' | 'created_at' | 'status'
         throw error;
     }
 
-    console.log('Lead created successfully:', data);
+    // Enhanced debug logging
+    console.log('[createLead] Supabase response data:', data);
+    console.log('[createLead] Lead ID:', data?.id);
+
+    if (!data?.id) {
+        console.warn('[createLead] ⚠️ No ID returned from Supabase! Check RLS SELECT policy.');
+    }
+
     return data as Lead;
 }
 

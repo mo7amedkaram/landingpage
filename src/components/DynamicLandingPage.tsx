@@ -17,7 +17,6 @@ import {
 } from '@/components/ui';
 import { createLead } from '@/lib/supabase';
 import { scrollToElement } from '@/lib/utils';
-import { trackLeadWithAdvancedMatching } from '@/lib/pixel-utils';
 import { SiteContent } from '@/lib/types';
 import { ThemeProvider } from './ThemeProvider';
 import { TestimonialsGrid } from './TestimonialsGrid';
@@ -91,15 +90,7 @@ export function DynamicLandingPage({ content }: DynamicLandingPageProps) {
     const onSubmit = async (data: FormData) => {
         setIsSubmitting(true);
         try {
-            // Track Lead event with Facebook Pixel Advanced Matching
-            await trackLeadWithAdvancedMatching({
-                user_name: data.user_name,
-                user_phone: data.user_phone,
-                friend_name: data.friend_name,
-                friend_phone: data.friend_phone,
-            });
-
-            // Save lead to database
+            // Save lead to database FIRST
             const newLead = await createLead({
                 user_name: data.user_name,
                 user_phone: data.user_phone,
@@ -107,7 +98,8 @@ export function DynamicLandingPage({ content }: DynamicLandingPageProps) {
                 friend_phone: data.friend_phone,
             });
 
-            // Redirect to thank you page with lead_id for pixel deduplication
+            // Redirect to thank you page with lead_id
+            // FB Pixel fires ONLY on thank-you page to prevent duplicates
             if (newLead?.id) {
                 router.push(`/thank-you?lead_id=${newLead.id}`);
             } else {

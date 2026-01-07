@@ -1,35 +1,66 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui';
-import { Button } from '@/components/ui';
-import { trackLeadConversion } from '@/components/PixelComponent';
-import { getWhatsAppLink } from '@/lib/utils';
-import { CheckCircle, MessageCircle, ArrowLeft, Heart } from 'lucide-react';
+import { CheckCircle, ArrowLeft, Heart } from 'lucide-react';
 import Link from 'next/link';
 
 function ThankYouContent() {
     const searchParams = useSearchParams();
     const leadId = searchParams.get('lead_id'); // Get unique DB ID for deduplication
-
-    const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '201234567890';
-    const whatsappMessage = 'مرحباً! أريد تأكيد حجزي في دورة الإسعافات الأولية.';
+    const fired = useRef(false); // Prevent double-firing in React Strict Mode
 
     useEffect(() => {
-        // Use lead_id as eventID for FB Pixel deduplication
-        // This prevents duplicate events even across browser sessions
-        if (leadId) {
-            // Fire with eventID - FB will deduplicate by this ID
-            trackLeadConversion(leadId);
-        } else {
-            // Fallback: use sessionStorage if no lead_id (direct page access)
-            const alreadyFired = sessionStorage.getItem('lead_event_fired');
-            if (!alreadyFired) {
-                trackLeadConversion();
-                sessionStorage.setItem('lead_event_fired', 'true');
+        // ROBUST DEDUPLICATION: Use localStorage to persist across remounts and Strict Mode
+        const dedupKey = leadId ? `lead_event_fired_${leadId}` : 'lead_event_fired_generic';
+        const alreadyFiredInStorage = typeof window !== 'undefined' && localStorage.getItem(dedupKey);
+
+        // Guard: Only fire if we haven't fired this specific lead_id
+        if (alreadyFiredInStorage || fired.current) {
+            console.log('[FB Pixel] Skipping duplicate - already fired for:', leadId || 'generic');
+            return;
+        }
+
+        // Mark as fired IMMEDIATELY (before any async operations)
+        fired.current = true;
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(dedupKey, 'true');
+            // Clean up old entries after 24 hours to prevent localStorage bloat
+            setTimeout(() => localStorage.removeItem(dedupKey), 24 * 60 * 60 * 1000);
+        }
+
+        console.log('[FB Pixel] Firing Lead event with eventID:', leadId || 'none');
+
+        // Fire Facebook Pixel Lead event with eventID for deduplication
+        if (typeof window !== 'undefined' && typeof window.fbq === 'function') {
+            if (leadId) {
+                window.fbq('track', 'Lead', {
+                    content_name: 'First Aid Course',
+                    value: 90.00,
+                    currency: 'EGP'
+                }, {
+                    eventID: leadId // The Golden Key for Server-Side Deduplication
+                });
+            } else {
+                // Fallback without eventID for direct page access
+                window.fbq('track', 'Lead', {
+                    content_name: 'First Aid Course',
+                    value: 90.00,
+                    currency: 'EGP'
+                });
             }
+        }
+
+        // Fire TikTok
+        if (typeof window !== 'undefined' && (window as any).ttq?.track) {
+            (window as any).ttq.track('SubmitForm');
+        }
+
+        // Fire Snapchat
+        if (typeof window !== 'undefined' && typeof (window as any).snaptr === 'function') {
+            (window as any).snaptr('track', 'SIGN_UP');
         }
     }, [leadId]);
 
@@ -73,9 +104,9 @@ function ThankYouContent() {
                                     تم تسجيل بياناتك وبيانات زميلك مبدئياً
                                 </h2>
                                 <p className="text-gray-600">
-                                    سنتواصل معكم قريباً في خلال 5 لــ 7 أيام برسالة القبول وتحديد موعد المنحة                                </p>
+                                    سنتواصل معكم قريباً في خلال 5 لــ 7 أيام برسالة القبول وتحديد موعد المنحة
+                                </p>
                             </motion.div>
-
 
                             {/* Back to Home */}
                             <motion.div

@@ -8,7 +8,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui';
 import { createLead } from '@/lib/supabase';
-import { trackLeadWithAdvancedMatching } from '@/lib/pixel-utils';
 import { User, Users, Loader2, CheckCircle } from 'lucide-react';
 
 // Egyptian phone number validation
@@ -64,15 +63,7 @@ export function RegistrationForm() {
         setSubmitError(null);
 
         try {
-            // Track Lead event with Facebook Pixel Advanced Matching
-            await trackLeadWithAdvancedMatching({
-                user_name: data.user_name,
-                user_phone: data.user_phone,
-                friend_name: data.friend_name,
-                friend_phone: data.friend_phone,
-            });
-
-            // Save lead to database
+            // Save lead to database FIRST
             const newLead = await createLead({
                 user_name: data.user_name,
                 user_phone: data.user_phone,
@@ -80,7 +71,8 @@ export function RegistrationForm() {
                 friend_phone: data.friend_phone,
             });
 
-            // Redirect to thank you page with lead_id for pixel deduplication
+            // Redirect to thank you page with lead_id
+            // FB Pixel fires ONLY on thank-you page to prevent duplicates
             if (newLead?.id) {
                 router.push(`/thank-you?lead_id=${newLead.id}`);
             } else {
